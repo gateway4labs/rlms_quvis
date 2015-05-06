@@ -1,16 +1,11 @@
 # -*-*- encoding: utf-8 -*-*-
 
-import sys
-import json
-import datetime
-import uuid
-import hashlib
-import urllib2
-
-from flask.ext.wtf import TextField, PasswordField, Required, URL, ValidationError
+import re
+import requests
+from bs4 import BeautifulSoup
 
 from labmanager.forms import AddForm
-from labmanager.rlms import register, Laboratory, Capabilities
+from labmanager.rlms import register, Laboratory
 from labmanager.rlms.base import BaseRLMS, BaseFormCreator, Versions
 
 class QuVisAddForm(AddForm):
@@ -40,6 +35,49 @@ FORM_CREATOR = QuVisFormCreator()
 # http://www.st-andrews.ac.uk/physics/quvis/simulations_twolev/
 # http://www.st-andrews.ac.uk/physics/quvis/simulations_html5/sims/
 
+def _extract_links(url, extension):
+    index_html = requests.get(url).text
+    soup = BeautifulSoup(index_html)
+    links = []
+    for anchor in soup.find_all("a"):
+        link = anchor.get("href")
+        if not link.startswith('?') and not link.startswith('/') and not link.startswith('http://') and not link.startswith('https://') and link.endswith(extension):
+            links.append(url + link)
+            
+    return links
+
+
+def get_html5_listing():
+    folder_links = _extract_links("http://www.st-andrews.ac.uk/physics/quvis/simulations_html5/sims/", '/')
+    all_links = {}
+    for folder_link in folder_links:
+        folder_name = folder_link.rsplit('/',2)[1]
+        folder_name = folder_name.replace('-',' ').replace('_',' ')
+        folder_name = re.sub("([a-z])([A-Z])","\g<1> \g<2>",folder_name)
+        current_folder_links = _extract_links(folder_link, '.html')
+        current_folder_links.extend(_extract_links(folder_link, '.htm'))
+        if current_folder_links:
+            all_links[folder_name] = current_folder_links[0]
+    return all_links
+
+def get_flash_listing():
+    raw_flash_links = _extract_links("http://www.st-andrews.ac.uk/physics/quvis/simulations_twolev/", '.swf')
+    flash_links = {}
+    for raw_flash_link in raw_flash_links:
+        lab_name = raw_flash_link.rsplit('/',1)[1]
+        if '.' in lab_name:
+            lab_name = lab_name.rsplit('.',1)[0]
+        lab_name = requests.utils.unquote(lab_name)
+        if lab_name.startswith('IOP - '):
+            lab_name = lab_name[len('IOP - '):]
+        flash_links[lab_name] = raw_flash_link
+    return flash_links
+
+def get_lab_listing():
+    lab_links = get_html5_listing()
+    lab_links.update(get_flash_listing())
+    return lab_links
+
 class RLMS(BaseRLMS):
 
     def __init__(self, configuration):
@@ -52,17 +90,29 @@ class RLMS(BaseRLMS):
         return [] 
 
     def get_laboratories(self):
-        return [ 
-            Laboratory('foo', 'bar', autoload = True) 
-        ]
+        labs = []
+        for lab_name, lab_link in get_lab_listing().iteritems():
+            labs.append(Laboratory(lab_name, lab_link, autoload = True))
+        return labs 
 
     def reserve(self, laboratory_id, username, institution, general_configuration_str, particular_configurations, request_payload, user_properties, *args, **kwargs):
-
-
+        url = laboratory_id
         return {
-            'reservation_id' : url,
+            'reservation_id' : requests.utils.quote(url, ''),
             'load_url' : url
         }
 
 register("QuVis", ['1.0'], __name__)
 
+def main():
+    rlms = RLMS("{}")
+    laboratories = rlms.get_laboratories()
+    print len(laboratories)
+    print
+    print laboratories[:10]
+    print
+    for lab in laboratories[:5]:
+        print rlms.reserve(lab.laboratory_id, 'tester', 'foo', '', '', '', '')
+
+if __name__ == '__main__':
+    main()
