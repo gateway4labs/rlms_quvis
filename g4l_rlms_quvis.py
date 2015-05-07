@@ -116,7 +116,11 @@ class RLMS(BaseRLMS):
             'load_url' : url
         }
 
+def populate_cache():
+    get_lab_listing()
+
 QUVIS = register("QuVis", ['1.0'], __name__)
+QUVIS.add_global_periodic_task('Populating cache', populate_cache, minutes = 55)
 
 def main():
     rlms = RLMS("{}")
