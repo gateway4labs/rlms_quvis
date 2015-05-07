@@ -5,7 +5,7 @@ import re
 from bs4 import BeautifulSoup
 
 from labmanager.forms import AddForm
-from labmanager.rlms import register, Laboratory, get_cached_session, GlobalCache
+from labmanager.rlms import register, Laboratory
 from labmanager.rlms.base import BaseRLMS, BaseFormCreator, Versions
 
 class QuVisAddForm(AddForm):
@@ -35,8 +35,8 @@ FORM_CREATOR = QuVisFormCreator()
 # http://www.st-andrews.ac.uk/physics/quvis/simulations_twolev/
 # http://www.st-andrews.ac.uk/physics/quvis/simulations_html5/sims/
 
-def _extract_links(cached_session, url, extension):
-    index_html = cached_session.get(url).text
+def _extract_links(url, extension):
+    index_html = QUVIS.cached_session.get(url).text
     soup = BeautifulSoup(index_html)
     links = []
     for anchor in soup.find_all("a"):
@@ -47,33 +47,33 @@ def _extract_links(cached_session, url, extension):
     return links
 
 
-def get_html5_listing(cached_session):
+def get_html5_listing():
     HTML5_URL = "http://www.st-andrews.ac.uk/physics/quvis/simulations_html5/sims/"
-    html5_links = CACHE.get(HTML5_URL)
+    html5_links = QUVIS.cache.get(HTML5_URL)
     if html5_links:
         return html5_links
 
-    folder_links = _extract_links(cached_session, HTML5_URL, '/')
+    folder_links = _extract_links(HTML5_URL, '/')
     all_links = {}
     for folder_link in folder_links:
         folder_name = folder_link.rsplit('/',2)[1]
         folder_name = folder_name.replace('-',' ').replace('_',' ')
         folder_name = re.sub("([a-z])([A-Z])","\g<1> \g<2>",folder_name)
-        current_folder_links = _extract_links(cached_session, folder_link, '.html')
-        current_folder_links.extend(_extract_links(cached_session, folder_link, '.htm'))
+        current_folder_links = _extract_links(folder_link, '.html')
+        current_folder_links.extend(_extract_links(folder_link, '.htm'))
         if current_folder_links:
             all_links[folder_name] = current_folder_links[0]
 
-    CACHE.save(HTML5_URL, all_links)
+    QUVIS.cache[HTML5_URL] = all_links
     return all_links
 
-def get_flash_listing(cached_session):
+def get_flash_listing():
     FLASH_URL = "http://www.st-andrews.ac.uk/physics/quvis/simulations_twolev/"
-    flash_links = CACHE.get(FLASH_URL)
+    flash_links = QUVIS.cache.get(FLASH_URL)
     if flash_links:
         return flash_links
 
-    raw_flash_links = _extract_links(cached_session, FLASH_URL, '.swf')
+    raw_flash_links = _extract_links(FLASH_URL, '.swf')
     flash_links = {}
     for raw_flash_link in raw_flash_links:
         lab_name = raw_flash_link.rsplit('/',1)[1]
@@ -84,13 +84,12 @@ def get_flash_listing(cached_session):
             lab_name = lab_name[len('IOP - '):]
         flash_links[lab_name] = raw_flash_link
 
-    CACHE.save(FLASH_URL, flash_links)
+    QUVIS.cache[FLASH_URL] = flash_links
     return flash_links
 
 def get_lab_listing():
-    cached_session = get_cached_session()
-    lab_links = get_html5_listing(cached_session)
-    lab_links.update(get_flash_listing(cached_session))
+    lab_links = get_html5_listing()
+    lab_links.update(get_flash_listing())
     return lab_links
 
 class RLMS(BaseRLMS):
@@ -117,8 +116,7 @@ class RLMS(BaseRLMS):
             'load_url' : url
         }
 
-register("QuVis", ['1.0'], __name__)
-CACHE = GlobalCache("QuVis - 1.0")
+QUVIS = register("QuVis", ['1.0'], __name__)
 
 def main():
     rlms = RLMS("{}")
