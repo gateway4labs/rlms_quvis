@@ -37,7 +37,7 @@ FORM_CREATOR = QuVisFormCreator()
 
 def _extract_links(url, extension):
     index_html = QUVIS.cached_session.timeout_get(url).text
-    soup = BeautifulSoup(index_html)
+    soup = BeautifulSoup(index_html, "lxml")
     links = []
     for anchor in soup.find_all("a"):
         link = anchor.get("href")
