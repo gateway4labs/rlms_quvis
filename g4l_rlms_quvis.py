@@ -36,7 +36,7 @@ FORM_CREATOR = QuVisFormCreator()
 # http://www.st-andrews.ac.uk/physics/quvis/simulations_html5/sims/
 
 def _extract_links(url, extension):
-    index_html = QUVIS.cached_session.get(url).text
+    index_html = QUVIS.cached_session.timeout_get(url).text
     soup = BeautifulSoup(index_html)
     links = []
     for anchor in soup.find_all("a"):
