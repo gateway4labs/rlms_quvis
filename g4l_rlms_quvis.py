@@ -5,7 +5,7 @@ import re
 from bs4 import BeautifulSoup
 
 from labmanager.forms import AddForm
-from labmanager.rlms import register, Laboratory
+from labmanager.rlms import register, Laboratory, Capabilities
 from labmanager.rlms.base import BaseRLMS, BaseFormCreator, Versions
 
 class QuVisAddForm(AddForm):
@@ -101,7 +101,26 @@ class RLMS(BaseRLMS):
         return Versions.VERSION_1
 
     def get_capabilities(self):
-        return [] 
+        return [ Capabilities.URL_FINDER]  
+
+    def get_base_urls(self):
+        return [ 'https://www.st-andrews.ac.uk/physics/quvis/', 'http://www.st-andrews.ac.uk/physics/quvis/' ]
+
+    def get_lab_by_url(self, url):
+        http_url = url.replace('https://', 'http://', 1)
+        http_url_quoted = requests.utils.quote(url.replace('https://', 'http://', 1), ':/')
+        http_url_flash1 = http_url.replace('.html', '.swf')
+        http_url_flash2 = http_url.replace('.html', '.swf')
+        http_url_quoted_flash1 = http_url_quoted.replace('.html', '.swf')
+        http_url_quoted_flash2 = http_url_quoted.replace('.htm', '.swf')
+        pack = http_url, http_url_quoted, http_url_flash1, http_url_flash2, http_url_quoted_flash1, http_url_quoted_flash2
+
+        for lab_name, lab_link in get_lab_listing().iteritems():
+            http_link = lab_link.replace('https://', 'http://', 1)
+            if http_link in pack:
+                return Laboratory(lab_name, lab_link, autoload = True)
+       
+        return None
 
     def get_laboratories(self):
         labs = []
