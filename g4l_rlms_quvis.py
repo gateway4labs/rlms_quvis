@@ -101,7 +101,7 @@ class RLMS(BaseRLMS):
         return Versions.VERSION_1
 
     def get_capabilities(self):
-        return [ Capabilities.URL_FINDER]  
+        return [ Capabilities.URL_FINDER, Capabilities.CHECK_URLS ]
 
     def get_base_urls(self):
         return [ 'https://www.st-andrews.ac.uk/physics/quvis/', 'http://www.st-andrews.ac.uk/physics/quvis/' ]
@@ -126,7 +126,10 @@ class RLMS(BaseRLMS):
         labs = []
         for lab_name, lab_link in get_lab_listing().iteritems():
             labs.append(Laboratory(lab_name, lab_link, autoload = True))
-        return labs 
+        return labs
+
+    def get_check_urls(self, laboratory_id):
+        return [ laboratory_id ]
 
     def reserve(self, laboratory_id, username, institution, general_configuration_str, particular_configurations, request_payload, user_properties, *args, **kwargs):
         url = laboratory_id
